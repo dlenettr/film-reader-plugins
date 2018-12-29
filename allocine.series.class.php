@@ -7,7 +7,7 @@
 -----------------------------------------------------
  Copyright (c)
 -----------------------------------------------------
- Date : 22.12.2018 [1.5]
+ Date : 30.12.2018 [1.6]
 =====================================================
 */
 
@@ -18,6 +18,9 @@ class FilmReader {
 
 	public function get( $url ) {
 		$html = $this->getURLContent( $url );
+
+		preg_match( "#\=([0-9]+)\.#is", $url, $_tmp );
+		$film_id = trim( $_tmp[1] );
 
 		$dom = new DOMDocument();
 		@$dom->loadHTML( $html );
@@ -66,6 +69,22 @@ class FilmReader {
 		}
 		$film['status'] = $this->cleanWords( $x->query('//div[contains(@class,"label-status")]')->item(0)->nodeValue );
 
+		if ( $x->query('//div[@class="meta-body-item meta-body-info"]')->length > 0 ) {
+			$_tmp = $this->cleanWords( $x->query('//div[@class="meta-body-item meta-body-info"]')->item(0)->nodeValue );
+			$_tmp = explode('/', $_tmp);
+			if ( count( $_tmp ) > 0 && strpos($_tmp[0], '201') !== false ) $film['year'] = $_tmp[0];
+			if ( count( $_tmp ) > 1 && strpos($_tmp[1], 'min') !== false ) $film['runtime'] = $_tmp[1];
+			if ( count( $_tmp ) > 2 ) $film['genres'] = $_tmp[2];
+		}
+
+		$html = $this->getURLContent("http://www.allocine.fr/series/ficheserie-{$film_id}/critiques/");
+
+		$dom = new DOMDocument();
+		@$dom->loadHTML( $html );
+		$x = new DOMXPath( $dom );
+
+		$film['ratingc'] = $this->cleanWords( $x->query('//span[@itemprop="ratingCount"]')->item(0)->nodeValue );
+
 		return $film;
 	}
 
@@ -89,3 +108,14 @@ class FilmReader {
 }
 
 @header( "Content-type: text/html; charset=utf-8" );
+
+/*
+$f = new FilmReader();
+echo "<pre>";
+//print_r( $f->get( "http://www.allocine.fr/series/ficheserie_gen_cserie=17358.html" ) );
+//print_r( $f->get( "http://www.allocine.fr/series/ficheserie_gen_cserie=19239.html" ) );
+//print_r( $f->get( "http://www.allocine.fr/series/ficheserie_gen_cserie=22118.html" ) );
+//print_r( $f->get( "http://www.allocine.fr/series/ficheserie_gen_cserie=21504.html" ) );
+//print_r( $f->get( "http://www.allocine.fr/series/ficheserie_gen_cserie=23381.html" ) );
+echo "</pre>";
+*/
