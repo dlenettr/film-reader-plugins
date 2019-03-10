@@ -7,7 +7,7 @@
 -----------------------------------------------------
  Copyright (c)
 -----------------------------------------------------
- Date : 02.04.2017 [2.4]
+ Date : 10.03.2019 [2.5]
 =====================================================
 */
 
@@ -24,20 +24,22 @@ class FilmReader {
 	public function get( $url ) {
 		$html = $this->getURLContent( $url );
 		$html = str_replace( array( "\n", "\r", "  " ), "", $html );
+		$re_html = mb_convert_encoding( $html, 'UTF-8', 'Windows-1252' );
 
 		$dom = new DOMDocument();
 		@$dom->loadHTML( $html );
 		$x = new DOMXPath( $dom );
 
 		$film['url'] = $this->cleanWords( $url );
-		$film['datelocal'] = $this->cleanWords( $x->query('//div[@class="meta-body-item"][1]/span[2]')->item(0)->nodeValue );
-		$film['name'] = $this->cleanWords( $x->query('//meta[@itemprop="name"]')->item(0)->getAttribute("content") ); $_tmp = array();
+		$film['datelocal'] = $this->cleanWords( $x->query('//div[@class="meta-body-item"][1]/strong/span[1]')->item(0)->nodeValue );
+		$film['name'] = $this->cleanWords( $x->query('//meta[@property="og:title"]')->item(0)->getAttribute("content") ); $_tmp = array();
 		foreach($x->query('//span[@itemprop="director"]/a/span[@itemprop="name"]') as $node) { $_tmp[] = $this->cleanWords( $node->nodeValue ); } $_dir = $_tmp;
-		$film['director'] = implode( ", ", $_tmp ); $_tmp = array();
+		$_tmp = array();
+		$film['director'] = $this->cleanWords( $x->query('//meta[@property="video:director"]')->item(0)->getAttribute("content") );
 		foreach($x->query('//a[contains(@href, "personne")]') as $node) { $_tmp[] = $this->cleanWords( $node->nodeValue ); }
 		$film['actors'] = implode( ", ", array_diff( $_tmp, $_dir ) ); $_tmp = array();
 		foreach($x->query('//span[@itemprop="genre"]') as $node) { $_tmp[] = $this->cleanWords( $node->nodeValue ); }
-		$film['genres'] = implode( ", ", $_tmp ); $_tmp = array();
+		$_tmp = array();
 		$_tmps = array(); $_key = array(); $_val = array();
 		foreach( $x->query('//div[@class="item"]/span[1]') as $node ) { $_key[] = $this->cleanWords( $node->nodeValue ); }
 		foreach( $x->query('//div[@class="item"]/*[2]') as $node ) { $_val[] = $this->cleanWords( $node->nodeValue ); }
@@ -53,16 +55,16 @@ class FilmReader {
 		$film['type'] = ( array_key_exists( "Type de film", $_tmps ) ) ? $_tmps["Type de film"] : "";
 		$film['color'] = ( array_key_exists( "Couleur", $_tmps ) ) ? $_tmps["Couleur"] : "";
 		$film['sound'] = ( array_key_exists( "Format audio", $_tmps ) ) ? $_tmps["Format audio"] : "";
-		preg_match_all( "#<div class=\"meta-body-item( with)*\">(.+?)</div>#is", mb_convert_encoding( $html, 'UTF-8', 'Windows-1252' ), $_tmp );
+		preg_match_all( "#<div class=\"meta-body-item( with)*\">(.+?)</div>#is", $re_html, $_tmp );
 		foreach( end( $_tmp ) as $_tmp2 ) {
 			if ( strpos( strip_tags( $_tmp2 ), "Nationalité" ) !== false ) {
 				$film['country'] = trim( str_replace( array( "Nationalité", "Nationalités" ), "", strip_tags( $_tmp2 ) ) );
 			}
 		}
-		$film['story'] = $this->cleanWords( $x->query('//div[@itemprop="description"]')->item(0)->nodeValue );
+		$film['story'] = $this->cleanWords( $x->query('//meta[@property="og:description"]')->item(0)->getAttribute("content") );
 		if ( empty( $film['story'] ) ) $film['story'] = $this->cleanWords( $x->query('//div[@class="margin_20b"]/p')->item(1)->nodeValue );
 		$film['productionfirm'] = $this->cleanWords( $x->query('//span[@itemprop="productionCompany"]/text()')->item(0)->nodeValue );
-		$film['img'] = $this->cleanWords( $x->query('//img[@itemprop="image"]')->item(0)->getAttribute("src") );
+		$film['img'] = $this->cleanWords( $x->query('//figure/span/img[@class="thumbnail-img"]')->item(0)->getAttribute("src") );
 		$film['orgimg'] = preg_replace( "#r_([0-9]+)_([0-9]+)#is", "r_400_800", $film['img'] );
 		if ( $x->query('//span[@itemprop="ratingValue"]')->item(0) ) {
 			$film['ratinga'] = $this->cleanWords( $x->query('//span[@itemprop="ratingValue"]')->item(0)->getAttribute("content") );
@@ -73,6 +75,12 @@ class FilmReader {
 		if ( preg_match( "#\\((.+?)\\)#is", $_tmp, $match ) ) {
 			$film['runtime'] = $this->cleanWords( $match[1] );
 		}
+
+		$film['genres'] = "";
+		if ( preg_match( "#\"genre\"\:\s\"(.+?)\"#is", $re_html, $match ) ) {
+			$film['genres'] = $this->cleanWords( $match[1] );
+		}
+
 		return $film;
 	}
 
@@ -112,5 +120,3 @@ print_r( $f->get( "http://www.allocine.fr/film/fichefilm_gen_cfilm=234319.html" 
 print_r( $f->get( "http://www.allocine.fr/film/fichefilm_gen_cfilm=190965.html" ) );
 echo "</pre>";
 */
-
-?>
