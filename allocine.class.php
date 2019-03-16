@@ -7,7 +7,7 @@
 -----------------------------------------------------
  Copyright (c)
 -----------------------------------------------------
- Date : 10.03.2019 [2.5]
+ Date : 16.03.2019 [2.6]
 =====================================================
 */
 
@@ -61,8 +61,8 @@ class FilmReader {
 				$film['country'] = trim( str_replace( array( "Nationalité", "Nationalités" ), "", strip_tags( $_tmp2 ) ) );
 			}
 		}
-		$film['story'] = $this->cleanWords( $x->query('//meta[@property="og:description"]')->item(0)->getAttribute("content") );
-		if ( empty( $film['story'] ) ) $film['story'] = $this->cleanWords( $x->query('//div[@class="margin_20b"]/p')->item(1)->nodeValue );
+		$film['story'] = $this->cleanWords( $x->query('//section[@id="synopsis-details"]/div[contains(@class, "content-txt")]')->item(0)->nodeValue );
+		if ( empty( $film['story'] ) ) $film['story'] = $this->cleanWords( $x->query('//meta[@property="og:description"]')->item(0)->getAttribute("content") );
 		$film['productionfirm'] = $this->cleanWords( $x->query('//span[@itemprop="productionCompany"]/text()')->item(0)->nodeValue );
 		$film['img'] = $this->cleanWords( $x->query('//figure/span/img[@class="thumbnail-img"]')->item(0)->getAttribute("src") );
 		$film['orgimg'] = preg_replace( "#r_([0-9]+)_([0-9]+)#is", "r_400_800", $film['img'] );
@@ -76,9 +76,29 @@ class FilmReader {
 			$film['runtime'] = $this->cleanWords( $match[1] );
 		}
 
-		$film['genres'] = "";
-		if ( preg_match( "#\"genre\"\:\s\"(.+?)\"#is", $re_html, $match ) ) {
-			$film['genres'] = $this->cleanWords( $match[1] );
+		preg_match( "#<script type=\"application\/ld\+json\">(.+?)<\/script>#is", $re_html, $matches );
+		$ld = json_decode( $matches[1], true );
+
+		if ( array_key_exists('genre', $ld) ) {
+			$film['genres'] = is_array( $ld['genre'] ) ? implode(', ', $ld['genre']) : $ld['genre'];
+		}
+
+		if ( array_key_exists('musicBy', $ld) ) {
+			$_tmp = [];
+			foreach( $ld['musicBy'] as $m ) {
+				$_tmp[] = $m['name'];
+			}
+			$film['soundtracks'] = implode(', ', $_tmp);
+		}
+
+		if ( array_key_exists('aggregateRating', $ld) ) {
+			$film['ratinga'] = $ld['aggregateRating']['ratingValue'];
+			$film['ratingb'] = $ld['aggregateRating']['bestRating'];
+			$film['ratingc'] = $ld['aggregateRating']['ratingCount'];
+		}
+
+		if ( array_key_exists('trailer', $ld) ) {
+			$film['trailer'] = $ld['trailer']['embedUrl'];
 		}
 
 		return $film;
@@ -110,13 +130,3 @@ class FilmReader {
 }
 
 @header( "Content-type: text/html; charset=utf-8" );
-
-/*
-$f = new FilmReader();
-echo "<pre>";
-print_r( $f->get( "http://www.allocine.fr/film/fichefilm_gen_cfilm=317.html" ) );
-print_r( $f->get( "http://www.allocine.fr/film/fichefilm_gen_cfilm=182266.html" ) );
-print_r( $f->get( "http://www.allocine.fr/film/fichefilm_gen_cfilm=234319.html" ) );
-print_r( $f->get( "http://www.allocine.fr/film/fichefilm_gen_cfilm=190965.html" ) );
-echo "</pre>";
-*/
